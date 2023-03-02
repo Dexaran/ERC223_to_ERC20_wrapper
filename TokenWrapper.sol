@@ -2,6 +2,11 @@
 
 pragma solidity 0.8.17;
 
+abstract contract IERC20
+{
+    function transferFrom(address sender, address spender, uint256 amount) external virtual returns (bool);
+}
+
 abstract contract IERC223Recipient { 
 /**
  * @dev Standard ERC223 function that will handle incoming token transfers.
@@ -155,11 +160,28 @@ contract WrappedERC223 is IERC223 {
      * All three of these values are immutable: they can only be set once during
      * construction.
      */
-    constructor (string memory new_name, string memory new_symbol, uint8 decimals, address erc20token) {
-        _name = new_name;
-        _symbol = new_symbol;
-        _decimals = decimals;
+    constructor (string memory new_name, string memory new_symbol, uint8 __decimals, address erc20token) {
+        _name        = new_name;
+        _symbol      = new_symbol;
+        _decimals    = __decimals;
         _wrapper_for = erc20token;
+    }
+
+    function wrapERC20(uint256 _amount) public returns (bool)
+    {
+        IERC20(_wrapper_for).transferFrom(msg.sender, address(this), _amount);
+        _mint(msg.sender, _amount);
+
+        return true;
+    }
+
+    function tokenReceived(address _from, uint _value, bytes memory _data) public
+    {
+        require(msg.sender == address(this), "ERC223: Token rejected.");
+
+        IERC223(_wrapper_for).transfer(_from, _value);
+
+        _burn(address(this), _value);
     }
     
     function standard() public pure returns (string memory)
@@ -445,7 +467,7 @@ contract WrappedERC223 is IERC223 {
 }
 
 
-contract TokenWrapper
+contract TokenConverter
 {
     // This contract is supposed to create the infrastructure to wrap ERC20 tokens
     // and create their ERC223 analogues and allow to change the ERC223 wrapped tokens
