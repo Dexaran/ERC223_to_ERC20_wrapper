@@ -18,6 +18,11 @@ abstract contract IERC223Recipient {
  * @dev Interface of the ERC20 standard as defined in the EIP.
  */
 interface IERC223 {
+
+    function name() external view returns (string memory);
+
+    function symbol() external view returns (string memory);
+
     /**
      * @dev Returns the amount of tokens in existence.
      */
@@ -445,4 +450,15 @@ contract TokenWrapper
     // This contract is supposed to create the infrastructure to wrap ERC20 tokens
     // and create their ERC223 analogues and allow to change the ERC223 wrapped tokens
     // back to the original ERC20 at any time.
+
+    mapping (address => address) token_wrappers;
+
+    function Wrap(address _erc20token) external 
+    {
+        if(token_wrappers[_erc20token] != address(0))
+        {
+            WrappedERC223 _new_token_wrapper = new WrappedERC223(IERC223(_erc20token).name(), IERC223(_erc20token).symbol(), IERC223(_erc20token).decimals(), _erc20token);
+            token_wrappers[_erc20token] = address(_new_token_wrapper);
+        }
+    }
 }
