@@ -2,10 +2,8 @@
 
 pragma solidity 0.8.17;
 
-abstract contract IERC20
-{
-    function transferFrom(address sender, address spender, uint256 amount) external virtual returns (bool);
-}
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/access/Ownable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 
 abstract contract IERC223Recipient { 
 /**
@@ -134,6 +132,23 @@ library Address {
         // solhint-disable-next-line no-inline-assembly
         assembly { codehash := extcodehash(account) }
         return (codehash != accountHash && codehash != 0x0);
+    }
+}
+
+contract WrappedERC20 is ERC20, IERC223Recipient
+{ 
+    constructor(string memory _name, string memory _symbol) ERC20( _name, _symbol) {
+   }
+    
+    /*
+    function burn(uint256 amount) internal {
+        _burn(_msgSender(), amount);
+    } */
+
+    // Someone is trying to wrap erc223 tokens to get erc20
+    function tokenReceived(address _from, uint _value, bytes memory _data) external override
+    {
+
     }
 }
 
@@ -467,20 +482,35 @@ contract WrappedERC223 is IERC223 {
 }
 
 
-contract TokenConverter
+contract TokenConverter is Ownable
 {
     // This contract is supposed to create the infrastructure to wrap ERC20 tokens
     // and create their ERC223 analogues and allow to change the ERC223 wrapped tokens
     // back to the original ERC20 at any time.
 
-    mapping (address => address) token_wrappers;
+    mapping (address => address) erc20_token_wrappers;
+    mapping (address => address) erc223_token_wrappers;
 
-    function Wrap(address _erc20token) external 
+    function WrapERC20(address _erc20token) external 
     {
-        if(token_wrappers[_erc20token] != address(0))
+        if(erc20_token_wrappers[_erc20token] != address(0))
         {
             WrappedERC223 _new_token_wrapper = new WrappedERC223(IERC223(_erc20token).name(), IERC223(_erc20token).symbol(), IERC223(_erc20token).decimals(), _erc20token);
-            token_wrappers[_erc20token] = address(_new_token_wrapper);
+            erc20_token_wrappers[_erc20token] = address(_new_token_wrapper);
         }
+    }
+
+    function WrapERC223(address _erc223token) external
+    {
+        if(erc223_token_wrappers[_erc223token] != address(0))
+        {
+            WrappedERC20 _new_token_wrapper = new WrappedERC20(IERC223(_erc223token).name(), IERC223(_erc223token).symbol());
+            erc223_token_wrappers[_erc223token] = address(_new_token_wrapper);
+        }
+    }
+
+    function ERC20Rescue(address _token, uint256 _amount) external onlyOwner
+    {
+        IERC20(_token).transfer(owner(), _amount);
     }
 }
